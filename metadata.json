@@ -1,0 +1,6 @@
+{
+  "name": "LiteERP Blueprint & Simulator",
+  "description": "Interactive blueprint and prototype simulator for a lightweight enterprise resource planning (ERP) system, featuring multi-role dashboards, mock transactions, and complete Supabase SQL schemas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
