@@ -25,17 +25,17 @@ interface ExportDataPayload {
 }
 
 /**
- * Creates an Excel worksheet prepended with the standard PT. Presitama Service Industry corporate letterhead.
+ * Creates an Excel worksheet prepended with the standard PT. UNIMETRIKA UTAMA corporate letterhead.
  */
 function createWorksheetWithKopSurat(title: string, headers: string[], rows: any[][]): XLSX.WorkSheet {
   const aoa = [
-    ['PT. Presitama Service Industry'],
-    ['Jl. Flores 1 Blok C No. 18, Kawasan Industri MM2100, Cibitung Bekasi 17520, Indonesia'],
-    ['Email: presitama01@gmail.com | Telp: +6281310006356'],
+    ['PT. UNIMETRIKA UTAMA'],
+    ['JL. Agung Timur 8 Blok D Kav. No.7 Sunter Jaya – Tanjung Priok Jakarta, Indonesia - 14350'],
+    ['Email: tuti@unimetrika.co.id, tuti.santoso@gmail.com | Telp: 02165304111 | Mob: +6281310318868'],
     [''],
     [`LAPORAN OPERASIONAL: ${title.toUpperCase()}`],
     ['Tanggal Generate:', new Date().toLocaleString('id-ID')],
-    ['Sistem Penunjang:', 'LITE-ERP Conceptual Cloud Engine'],
+    ['Sistem Penunjang:', 'LITE-ERP Cloud Engine'],
     [''],
     headers,
     ...rows
@@ -47,7 +47,7 @@ function createWorksheetWithKopSurat(title: string, headers: string[], rows: any
   if (!ws['!merges']) {
     ws['!merges'] = [];
   }
-  // Merge "PT. Presitama Service Industry"
+  // Merge "PT. UNIMETRIKA UTAMA"
   ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } });
   // Merge Address
   ws['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 6 } });

@@ -85,7 +85,6 @@ export default function App() {
   const [activeRole, setActiveRole] = useState<UserRole>(() => {
     return (localStorage.getItem('psi_active_role') as UserRole) || 'admin';
   });
-  const [activeBranch, setActiveBranch] = useState<string>('HO - Jakarta Barat');
   const [currentView, setView] = useState<string>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -702,7 +701,6 @@ export default function App() {
             auditLogs={auditLogs}
             setView={setView}
             activeRole={activeRole}
-            activeBranch={activeBranch}
             supabaseStatus={supabaseStatus}
             supabaseMessage={supabaseMessage}
             isSeeding={isSeeding}
@@ -959,7 +957,6 @@ export default function App() {
         currentView={currentView}
         setView={setView}
         activeRole={activeRole}
-        activeBranch={activeBranch}
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
         onLogout={handleLogout}
@@ -972,8 +969,6 @@ export default function App() {
         <Navbar 
           activeRole={activeRole}
           setActiveRole={handleRoleSimulationSwap}
-          activeBranch={activeBranch}
-          setActiveBranch={setActiveBranch}
           setSidebarOpen={setSidebarOpen}
           sidebarOpen={sidebarOpen}
         />
@@ -1087,7 +1082,7 @@ export default function App() {
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: PT Presitama Service Industry..."
+                  placeholder="Contoh: PT UNIMETRIKA UTAMA..."
                   value={newSupplierName}
                   onChange={(e) => setNewSupplierName(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 p-2.5 font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
@@ -1098,7 +1093,7 @@ export default function App() {
                 <label className="block text-slate-700 font-bold">Nomor Telepon</label>
                 <input
                   type="text"
-                  placeholder="Contoh: +6281310006356..."
+                  placeholder="Contoh: +6281310318868..."
                   value={newSupplierPhone}
                   onChange={(e) => setNewSupplierPhone(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 p-2.5 font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
@@ -1108,7 +1103,7 @@ export default function App() {
               <div className="space-y-1">
                 <label className="block text-slate-700 font-bold">Alamat Lengkap</label>
                 <textarea
-                  placeholder="Contoh: Jl. Flores 1 Blok C No. 18, Kawasan MM2100..."
+                  placeholder="Contoh: JL. Agung Timur 8 Sunter Jaya, Jakarta..."
                   value={newSupplierAddress}
                   onChange={(e) => setNewSupplierAddress(e.target.value)}
                   rows={3}

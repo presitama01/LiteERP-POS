@@ -479,7 +479,7 @@ export default function CorporateDocumentsView({
             Supply Chain & Corporate Sales Documents
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Sistem pengarsipan, pembuatan, pencetakan berkas SCM dari Hulu ke Hilir dengan standard penulisan Kop Surat khusus <b>PT. Presitama Service Industry</b>.
+            Sistem pengarsipan, pembuatan, pencetakan berkas SCM dari Hulu ke Hilir dengan standard penulisan Kop Surat khusus <b>PT. UNIMETRIKA UTAMA</b>.
           </p>
         </div>
 
@@ -704,16 +704,16 @@ export default function CorporateDocumentsView({
                   {/* PT. PRESITAMA SERVICE INDUSTRY - KOP SURAT PAJAK */}
                   <div className="flex flex-col md:flex-row justify-between items-center pb-4 border-b-2 border-double border-slate-900 gap-4">
                     <div className="space-y-1 text-center md:text-left">
-                      <h1 className="text-xl font-bold tracking-tight text-slate-900 uppercase font-sans">PT. Presitama Service Industry</h1>
+                      <h1 className="text-xl font-bold tracking-tight text-slate-900 uppercase font-sans">PT. UNIMETRIKA UTAMA</h1>
                       <div className="text-[10px] font-semibold text-slate-500 max-w-lg leading-relaxed">
-                        <p>Jl. Flores 1 Blok C No. 18, Kawasan Industri MM2100, Cibitung Bekasi 17520, Indonesia</p>
-                        <p className="mt-0.5">📧 {`presitama01@gmail.com`} | 📞 {`+6281310006356`}</p>
+                        <p>JL. Agung Timur 8 Blok D Kav. No.7 Sunter Jaya – Tanjung Priok Jakarta, Indonesia - 14350</p>
+                        <p className="mt-0.5">📧 {`tuti@unimetrika.co.id, tuti.santoso@gmail.com`} | 📞 {`02165304111 / Fax: 02165304110 / Mob: +6281310318868`}</p>
                       </div>
                     </div>
                     
                     {/* Visual Stamp Block */}
                     <div className="shrink-0 border-2 border-dashed border-indigo-400 text-indigo-700 p-2 text-center rounded text-[10px] font-black tracking-wider uppercase">
-                      PT. PSI LOGISTICS <br />
+                      PT. UNIMETRIKA UTAMA <br />
                       <span className="text-[8px] font-mono text-slate-400">STATUS: APPROVED CO.</span>
                     </div>
                   </div>
@@ -747,7 +747,7 @@ export default function CorporateDocumentsView({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 border border-slate-100 p-4 rounded-xl leading-relaxed text-slate-600 font-semibold">
                     <div>
                       <span className="block text-[8px] text-slate-400 font-black uppercase tracking-wider mb-1">Diterbitkan Atas Nama:</span>
-                      <p className="text-xs font-bold text-indigo-950">PT. Presitama Service Industry</p>
+                      <p className="text-xs font-bold text-indigo-950">PT. UNIMETRIKA UTAMA</p>
                       <p className="text-[11px] text-slate-500 mt-1">Seksi Divisi SCM Logistik Utama</p>
                       <p className="text-[10px] text-slate-400 font-mono mt-1">Operator: {selectedDoc.createdBy}</p>
                     </div>
@@ -844,7 +844,7 @@ export default function CorporateDocumentsView({
                   {/* DOUBLE SIGNATURE BLOCK - CORPORATE STANDARD */}
                   <div className="pt-8 grid grid-cols-2 gap-8 text-center text-xs text-slate-500 font-semibold leading-relaxed">
                     <div className="space-y-12">
-                      <p>Hormat Kami,<br /><strong>PT. Presitama Service Industry</strong></p>
+                      <p>Hormat Kami,<br /><strong>PT. UNIMETRIKA UTAMA</strong></p>
                       <div>
                         <span className="border-b border-slate-400 block w-40 mx-auto font-bold text-slate-800">{selectedDoc.createdBy}</span>
                         <span className="text-[9px] text-slate-400">Divisi SCM Otorisator</span>
