@@ -222,7 +222,67 @@ $$ language plpgsql;
 create trigger trg_sales_stock
 after insert on sales_items
 for each row
-execute function update_stock_after_sales();`
+execute function update_stock_after_sales();`,
+
+    financialEnhancements: `-- =========================================================================
+-- TAMBAHAN SQL: MODUL COST, HUTANG PIUTANG, DAN PAJAK (VAT/PPN & FINAL UMKM)
+-- =========================================================================
+
+-- A. STRUKTUR PAYABLE/RECEIVABLE DI TABLE PURCHASES & SALES
+-- Menambah kolom status termin pembayaran & metode untuk pelacakan hutang-piutang
+
+-- 1. Tambah kolom di table purchases (Hutang Restock)
+ALTER TABLE purchases 
+ADD COLUMN IF NOT EXISTS payment_method text DEFAULT 'Cash';
+
+ALTER TABLE purchases 
+ADD COLUMN IF NOT EXISTS payment_status text DEFAULT 'PAID' 
+CHECK (payment_status IN ('PAID', 'UNPAID'));
+
+-- 2. Tambah kolom di table sales (Piutang POS)
+ALTER TABLE sales 
+ADD COLUMN IF NOT EXISTS grand_total numeric(18,2) DEFAULT 0;
+
+ALTER TABLE sales 
+ADD COLUMN IF NOT EXISTS discount numeric(18,2) DEFAULT 0;
+
+ALTER TABLE sales 
+ADD COLUMN IF NOT EXISTS tax numeric(18,2) DEFAULT 0;
+
+ALTER TABLE sales 
+ADD COLUMN IF NOT EXISTS payment_method text DEFAULT 'Cash';
+
+ALTER TABLE sales 
+ADD COLUMN IF NOT EXISTS payment_status text DEFAULT 'PAID' 
+CHECK (payment_status IN ('PAID', 'UNPAID'));
+
+
+-- B. INDEKS OPTIMASI QUERY SINKRONISASI
+-- Mempercepat kalkulasi Cost, Hutang-Piutang, PPN Masukan-Keluaran secara periodik
+
+CREATE INDEX IF NOT EXISTS idx_purchases_status_method 
+ON purchases(payment_status, payment_method);
+
+CREATE INDEX IF NOT EXISTS idx_sales_status_method 
+ON sales(payment_status, payment_method);
+
+
+-- C. STORED PROCEDURE / VIEW LAPORAN PAJAK & BIAYA
+-- Menyediakan summary agregat PPN Keluaran, PPN Masukan, Net VAT Payable, dan PPh Final 0.5% (UMKM)
+
+CREATE OR REPLACE VIEW view_tax_and_debt_summary AS
+SELECT 
+    -- Piutang Dagang (Sales Unpaid)
+    COALESCE(SUM(CASE WHEN payment_status = 'UNPAID' THEN grand_total ELSE 0 END), 0) as total_piutang_outstanding,
+    -- Hutang Dagang (Purchase Unpaid)
+    (SELECT COALESCE(SUM(CASE WHEN payment_status = 'UNPAID' THEN total ELSE 0 END), 0) FROM purchases) as total_hutang_outstanding,
+    -- Pajak Keluaran (PPN 11% dari Sales)
+    COALESCE(SUM(tax), 0) as total_pajak_keluaran,
+    -- Pajak Masukan (PPN 11% dari Purchases)
+    (SELECT COALESCE(SUM(total * 0.11), 0) FROM purchases) as total_pajak_masukan,
+    -- PPh Final UMKM (0.5% dari Omset Bruto)
+    COALESCE(SUM(total) * 0.005, 0) as estimasi_pph_final_umkm
+FROM sales;`
   };
 
   return (
@@ -331,6 +391,23 @@ execute function update_stock_after_sales();`
               </div>
               <pre className="p-4 overflow-x-auto text-[10px] sm:text-xs font-mono text-slate-300 bg-slate-950 leading-relaxed max-h-[350px]">
                 {sqlSnippets.triggers}
+              </pre>
+            </div>
+
+            {/* Chunk 4: Financial Enhancements for Cost, Hutang-Piutang, Tax */}
+            <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+              <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 font-mono">4. SQL Tambahan: Perhitungan Cost, Hutang Piutang, & Pajak</span>
+                <button
+                  onClick={() => handleCopy(sqlSnippets.financialEnhancements, 'fin_add')}
+                  className="flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-slate-800 bg-white border border-slate-200 rounded px-2 py-1 shadow-2xs"
+                >
+                  {copiedId === 'fin_add' ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                  <span>{copiedId === 'fin_add' ? 'Copied' : 'Salin SQL'}</span>
+                </button>
+              </div>
+              <pre className="p-4 overflow-x-auto text-[10px] sm:text-xs font-mono text-slate-300 bg-slate-950 leading-relaxed max-h-[350px]">
+                {sqlSnippets.financialEnhancements}
               </pre>
             </div>
           </div>

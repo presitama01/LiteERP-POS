@@ -200,6 +200,8 @@ export async function fetchAllSupabaseData(): Promise<SupabaseDataPayload> {
       supplierId: Number(p.supplier_id),
       purchaseDate: p.purchase_date,
       total: Number(p.total || 0),
+      paymentMethod: p.payment_method || 'Cash',
+      paymentStatus: (p.payment_status as any) || 'PAID',
       createdBy: p.created_by_name || 'System',
       createdAt: p.created_at,
       items: itemsOfP
@@ -227,6 +229,7 @@ export async function fetchAllSupabaseData(): Promise<SupabaseDataPayload> {
       salesDate: s.sales_date,
       total: Number(s.total || 0),
       paymentMethod: s.payment_method || 'CASH',
+      paymentStatus: (s.payment_status as any) || 'PAID',
       discount: Number(s.discount || 0),
       tax: Number(s.tax || 0),
       grandTotal: Number(s.grand_total || s.total || 0),
@@ -369,6 +372,7 @@ export async function insertSalesOrder(
       sales_date: salesOrder.salesDate,
       total: salesOrder.total,
       payment_method: salesOrder.paymentMethod,
+      payment_status: salesOrder.paymentStatus || 'PAID',
       discount: salesOrder.discount,
       tax: salesOrder.tax,
       grand_total: salesOrder.grandTotal
@@ -415,6 +419,7 @@ export async function insertSalesOrder(
     salesDate: headerData.sales_date,
     total: Number(headerData.total),
     paymentMethod: headerData.payment_method,
+    paymentStatus: headerData.payment_status || 'PAID',
     discount: Number(headerData.discount || 0),
     tax: Number(headerData.tax || 0),
     grandTotal: Number(headerData.grand_total || headerData.total || 0),
@@ -436,7 +441,9 @@ export async function insertPurchaseOrder(
       invoice_number: purchaseOrder.invoiceNumber,
       supplier_id: purchaseOrder.supplierId,
       purchase_date: purchaseOrder.purchaseDate,
-      total: purchaseOrder.total
+      total: purchaseOrder.total,
+      payment_method: purchaseOrder.paymentMethod || 'Cash',
+      payment_status: purchaseOrder.paymentStatus || 'PAID'
     }])
     .select()
     .single();
@@ -479,6 +486,8 @@ export async function insertPurchaseOrder(
     supplierId: Number(headerData.supplier_id),
     purchaseDate: headerData.purchase_date,
     total: Number(headerData.total),
+    paymentMethod: headerData.payment_method || 'Cash',
+    paymentStatus: headerData.payment_status || 'PAID',
     createdBy: purchaseOrder.createdBy,
     createdAt: headerData.created_at,
     items: mappedItems

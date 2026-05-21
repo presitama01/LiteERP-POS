@@ -61,10 +61,27 @@ export default function Navbar({
 
       {/* Right side: Adaptive Controls Simulator */}
       <div className="flex items-center gap-4">
+        {/* Dynamic Role Selector Dropdown */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="role-select" className="hidden lg:inline text-[10px] font-black uppercase text-slate-450 tracking-wider">Simulasi Role:</label>
+          <select
+            id="role-select"
+            value={activeRole}
+            onChange={handleRoleChange}
+            className="rounded-lg border border-slate-200 bg-slate-50 text-[11px] font-extrabold text-slate-700 py-1.5 px-2.5 focus:border-blue-500 focus:outline-none cursor-pointer"
+          >
+            <option value="admin">👑 Administrator</option>
+            <option value="kasir">🛍️ Kasir POS (Siti)</option>
+            <option value="purchasing">💼 Purchasing (Andi)</option>
+            <option value="gudang">📦 Logistik Gudang (Hasan)</option>
+            <option value="finance">💰 Keuangan (Rian)</option>
+          </select>
+        </div>
+
         {/* Supabase Connection State badge */}
-        <div className="hidden items-center gap-1 text-xs text-slate-500 xl:flex bg-slate-50 border border-slate-100 rounded-full py-1 px-3">
-          <CheckCircle2 size={13} className="text-emerald-500" />
-          <span className="font-medium text-slate-600">Simulated Supabase Auth & PostgreSQL API Ready</span>
+        <div className="hidden xl:flex items-center gap-1.5 text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-100 rounded-full py-1.5 px-3">
+          <CheckCircle2 size={12} className="text-emerald-500" />
+          <span>Supabase Sync Active</span>
         </div>
 
         {/* Micro Profile Detail Avatar */}

@@ -46,6 +46,8 @@ interface FinanceViewProps {
   categories: Category[];
   suppliers: Supplier[];
   customers: Customer[];
+  setPurchases?: React.Dispatch<React.SetStateAction<Purchase[]>>;
+  setSales?: React.Dispatch<React.SetStateAction<Sales[]>>;
 }
 
 export default function FinanceView({
@@ -58,10 +60,12 @@ export default function FinanceView({
   purchases,
   categories,
   suppliers,
-  customers
+  customers,
+  setPurchases,
+  setSales
 }: FinanceViewProps) {
   // Navigation tabs for Finance view
-  const [activeSubTab, setActiveSubTab] = useState<'ledger' | 'rugi_laba' | 'export_center'>('ledger');
+  const [activeSubTab, setActiveSubTab] = useState<'ledger' | 'rugi_laba' | 'export_center' | 'neraca_pajak'>('ledger');
   
   // Search state for Ledger
   const [searchTerm, setSearchTerm] = useState('');
@@ -120,6 +124,90 @@ export default function FinanceView({
   // Bottom Line Profit after operating expenses
   const netProfit = grossProfit + otherRevenue - operatingExpenses;
   const netProfitMargin = netSalesRevenue > 0 ? (netProfit / netSalesRevenue) * 100 : 0;
+
+  // ===============================================
+  // COST, HUTANG PIUTANG, & PAJAK MATH GENERATORS
+  // ===============================================
+  
+  // A. HUTANG USABA / ACCOUNTS PAYABLE (RESTOCKS ON TEMPO)
+  const unpaidPurchasesList = purchases.filter(p => p.paymentStatus === 'UNPAID' || p.paymentMethod === 'Tempo');
+  const totalHutangOutstanding = unpaidPurchasesList.reduce((sum, p) => sum + p.total, 0);
+
+  // B. PIUTANG DAGANG / ACCOUNTS RECEIVABLE (SALES ON TEMPO)
+  const unpaidSalesList = sales.filter(s => s.paymentStatus === 'UNPAID' || s.paymentMethod === 'Tempo');
+  const totalPiutangOutstanding = unpaidSalesList.reduce((sum, s) => sum + s.grandTotal, 0);
+
+  // C. PAJAK SUMMARY (PPN & PPH)
+  const totalPajakKeluaran = sales.reduce((sum, s) => sum + (s.tax || 0), 0);
+  const totalPajakMasukan = purchases.reduce((sum, p) => sum + (p.total * 0.11), 0);
+  const netPPNLiability = totalPajakKeluaran - totalPajakMasukan;
+  const totalTaxPPhUMKM = totalRawSales * 0.005;
+
+  // D. COST BREAKDOWNS
+  const totalBusinessCosts = totalHPP + operatingExpenses;
+  const costToRevenueRatio = netSalesRevenue > 0 ? (totalBusinessCosts / netSalesRevenue) * 100 : 0;
+  const hppToRevenueRatio = netSalesRevenue > 0 ? (totalHPP / netSalesRevenue) * 100 : 0;
+  const opexToRevenueRatio = netSalesRevenue > 0 ? (operatingExpenses / netSalesRevenue) * 100 : 0;
+
+  // PAYABLE DISBURSEMENT SETTLEMENT handler
+  const handlePaySupplierDebt = (purchase: Purchase) => {
+    if (!setPurchases) {
+      alert("Fungsi mutasi database Supabase tidak terikat.");
+      return;
+    }
+    const supName = suppliers.find(s => s.id === purchase.supplierId)?.name || 'Supplier';
+    const confirmPay = window.confirm(`Apakah Anda yakin ingin MELUNASI hutang kepada supplier "${supName}" sebesar ${formatIDR(purchase.total)}?\n\nTindakan ini secara langsung menyimpan transaksi pengeluaran (EXPENSE) di buku kas harian.`);
+    if (!confirmPay) return;
+
+    // Trigger state mutation wrapper -> sync to Supabase with payment_status = 'PAID'
+    setPurchases(prev => prev.map(p => p.id === purchase.id ? { ...p, paymentStatus: 'PAID' as const } : p));
+
+    // Register general ledger expense record
+    const nextTxId = financials.length > 0 ? Math.max(...financials.map(f => f.id)) + 1 : 1;
+    const newTx: FinancialTransaction = {
+      id: nextTxId,
+      transactionDate: new Date().toISOString().slice(0, 10),
+      type: 'EXPENSE',
+      description: `Pelunasan Hutang Pembelian SCM (Faktur #${purchase.invoiceNumber}) - Supplier: ${supName}`,
+      amount: purchase.total,
+      createdBy: activeRole === 'admin' ? 'Administrator' : 'Finance Officer Rian',
+      createdAt: new Date().toISOString()
+    };
+    setFinancials(prev => [newTx, ...prev]);
+
+    addAuditLog(`Pelunasan HUTANG usaha berhasil disinkronisasi ke server Supabase. Faktur ${purchase.invoiceNumber} senilai ${formatIDR(purchase.total)}.`, 'success', 'finance');
+    alert(`Pembayaran lunas terdaftar untuk supplier ${supName} sebesar ${formatIDR(purchase.total)}.`);
+  };
+
+  // RECEIVABLE COLLECTION SETTLEMENT handler
+  const handleCollectCustomerPiutang = (sale: Sales) => {
+    if (!setSales) {
+      alert("Fungsi mutasi database Supabase tidak terikat.");
+      return;
+    }
+    const custName = customers.find(c => c.id === sale.customerId)?.name || 'Pelanggan';
+    const confirmCollect = window.confirm(`Apakah Anda yakin telah menerima pelunasan pembayaran dari customer "${custName}" sebesar ${formatIDR(sale.grandTotal)}?\n\nTindakan ini secara langsung menyimpan pengisian kas masuk (INCOME) di buku harian.`);
+    if (!confirmCollect) return;
+
+    // Trigger state mutation wrapper -> sync to Supabase with payment_status = 'PAID'
+    setSales(prev => prev.map(s => s.id === sale.id ? { ...s, paymentStatus: 'PAID' as const } : s));
+
+    // Register general ledger income record
+    const nextTxId = financials.length > 0 ? Math.max(...financials.map(f => f.id)) + 1 : 1;
+    const newTx: FinancialTransaction = {
+      id: nextTxId,
+      transactionDate: new Date().toISOString().slice(0, 10),
+      type: 'INCOME',
+      description: `Pelunasan Piutang POS Penjualan (Faktur #${sale.invoiceNumber}) - Pelanggan: ${custName}`,
+      amount: sale.grandTotal,
+      createdBy: activeRole === 'admin' ? 'Administrator' : 'Finance Officer Rian',
+      createdAt: new Date().toISOString()
+    };
+    setFinancials(prev => [newTx, ...prev]);
+
+    addAuditLog(`Penerimaan PIUTANG usaha berhasil disinkronisasi ke server Supabase. Faktur ${sale.invoiceNumber} senilai ${formatIDR(sale.grandTotal)}.`, 'success', 'finance');
+    alert(`Dana masuk terdaftar dari pelanggan ${custName} sebesar ${formatIDR(sale.grandTotal)}.`);
+  };
 
   // Handle manual journal logging
   const handleAddTransaction = (e: React.FormEvent) => {
@@ -204,6 +292,14 @@ export default function FinanceView({
             }`}
           >
             📉 Laporan Rugi Laba
+          </button>
+          <button
+            onClick={() => setActiveSubTab('neraca_pajak')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeSubTab === 'neraca_pajak' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            📋 Analisis Neraca & Pajak
           </button>
           <button
             onClick={() => setActiveSubTab('export_center')}
@@ -615,6 +711,287 @@ export default function FinanceView({
             <p className="text-[11px]">
               Seluruh sheet data di atas kompatibel 100% untuk diunggah ulang ke system lain atau dibuat analisis grafik di Google Sheets, Microsoft Excel, LibreOffice, atau Apple Numbers.
             </p>
+          </div>
+
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. VIEW CONTENT: DEBT, TAX & COST REPORTING CENTER (NERACA PAJAK) */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'neraca_pajak' && (
+        <div className="space-y-6">
+          {/* KPI CARDS DETAILED */}
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-4 animate-in fade-in duration-300">
+            
+            {/* Piutang Dagang Card */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Total Piutang Dagang (A/R)</span>
+                <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Tagihan Pelanggan</span>
+              </div>
+              <p className="mt-3 text-xl font-bold text-slate-900 font-mono">{formatIDR(totalPiutangOutstanding)}</p>
+              <span className="text-[10px] text-slate-400 mt-1 block font-semibold">Berasal dari {unpaidSalesList.length} invoice penjualan tempo</span>
+            </div>
+
+            {/* Hutang Usaha Card */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Total Hutang Usaha (A/P)</span>
+                <span className="text-[9px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">Kewajiban Supplier</span>
+              </div>
+              <p className="mt-3 text-xl font-bold text-slate-900 font-mono">{formatIDR(totalHutangOutstanding)}</p>
+              <span className="text-[10px] text-slate-400 mt-1 block font-semibold">Berasal dari {unpaidPurchasesList.length} faktur restock tempo</span>
+            </div>
+
+            {/* Selisih VAT/PPN */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">VAT/PPN Terutang (Net PPN)</span>
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${netPPNLiability >= 0 ? 'text-indigo-600 bg-indigo-50' : 'text-emerald-600 bg-emerald-50'}`}>
+                  {netPPNLiability >= 0 ? 'Kurang Bayar' : 'Lebih Bayar'}
+                </span>
+              </div>
+              <p className="mt-3 text-xl font-bold text-slate-900 font-mono">{formatIDR(netPPNLiability)}</p>
+              <span className="text-[10px] text-slate-400 mt-1 block font-semibold">Output PPN ({formatIDR(totalPajakKeluaran)}) - Input PPN ({formatIDR(totalPajakMasukan)})</span>
+            </div>
+
+            {/* PPh Final UMKM */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">PPh Final PP 55 (0.5%)</span>
+                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Bruto Final UMKM</span>
+              </div>
+              <p className="mt-3 text-xl font-bold text-slate-900 font-mono">{formatIDR(totalTaxPPhUMKM)}</p>
+              <span className="text-[10px] text-slate-400 mt-1 block font-semibold">Dihitung dari total omset bruto ({formatIDR(totalRawSales)})</span>
+            </div>
+
+          </section>
+
+          {/* TWO COLUMN DETAIL AREA: HUTANG vs PIUTANG DETAILED LISTINGS WITH SETTLEMENT TRIGGER BUTTONS */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-300">
+            
+            {/* LEFT COLUMN: HUTANG OPERATIONALS */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+              <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">1. Daftar Hutang Dagang (Accounts Payable)</h3>
+                  <p className="text-[10px] text-slate-400 font-medium">Daftar transaksi restocking yang belum dibayar lunas ke supplier.</p>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase text-rose-700 bg-rose-50 border border-rose-100">
+                  {unpaidPurchasesList.length} Outstanding
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
+                  {unpaidPurchasesList.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400 border border-dashed border-slate-100 rounded-lg">
+                      <p className="text-xs font-semibold">🎉 Sempurna! Seluruh hutang supplier Anda telah lunas dibayar.</p>
+                    </div>
+                  ) : (
+                    unpaidPurchasesList.map(purchase => {
+                      const sup = suppliers.find(s => s.id === purchase.supplierId);
+                      return (
+                        <div key={purchase.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between hover:bg-slate-100/50 transition-colors">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-slate-500 font-mono">#{purchase.invoiceNumber}</span>
+                              <span className="text-[9px] font-extrabold text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">TEMPO</span>
+                            </div>
+                            <h4 className="text-xs font-bold text-slate-800">Pemasok: {sup?.name || `ID Supplier: ${purchase.supplierId}`}</h4>
+                            <p className="text-[10px] text-slate-400">Tanggal Transaksi: {purchase.purchaseDate}</p>
+                          </div>
+                          <div className="text-right space-y-2">
+                            <p className="text-xs font-black text-slate-900 font-mono">{formatIDR(purchase.total)}</p>
+                            
+                            <button
+                              type="button"
+                              onClick={() => handlePaySupplierDebt(purchase)}
+                              className="inline-flex items-center gap-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[9px] uppercase px-2.5 py-1 rounded-md transition-all active:scale-95 cursor-pointer shadow-xs border-0"
+                            >
+                              💵 Beri Pelunasan
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: PIUTANG OPERATIONALS */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+              <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">2. Daftar Piutang Pelanggan (Accounts Receivable)</h3>
+                  <p className="text-[10px] text-slate-400 font-medium">Tagihan penjualan kasir POS tempo yang belum disetor oleh pelanggan.</p>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase text-amber-700 bg-amber-50 border border-amber-100">
+                  {unpaidSalesList.length} Outstanding
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
+                  {unpaidSalesList.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400 border border-dashed border-slate-100 rounded-lg">
+                      <p className="text-xs font-semibold">🎉 Hebat! Seluruh piutang dari customer Anda lunas tertagih.</p>
+                    </div>
+                  ) : (
+                    unpaidSalesList.map(sale => {
+                      const cust = customers.find(c => c.id === sale.customerId);
+                      return (
+                        <div key={sale.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between hover:bg-slate-100/50 transition-colors">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-slate-500 font-mono">#{sale.invoiceNumber}</span>
+                              <span className="text-[9px] font-extrabold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">TEMPO</span>
+                            </div>
+                            <h4 className="text-xs font-bold text-slate-800">Pelanggan: {cust?.name || `ID Pelanggan: ${sale.customerId}`}</h4>
+                            <p className="text-[10px] text-slate-400">Tanggal Transaksi: {sale.salesDate} | Kasir: {sale.createdBy}</p>
+                          </div>
+                          <div className="text-right space-y-2">
+                            <p className="text-xs font-black text-slate-900 font-mono">{formatIDR(sale.grandTotal)}</p>
+                            
+                            <button
+                              type="button"
+                              onClick={() => handleCollectCustomerPiutang(sale)}
+                              className="inline-flex items-center gap-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[9px] uppercase px-2.5 py-1 rounded-md transition-all active:scale-95 cursor-pointer shadow-xs border-0"
+                            >
+                              📥 Terima Kolektif
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* LOWER SECTION: COST & TAX DETAILED BREAKDOWNS */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+            
+            {/* COLUMN 1: COST EFFICIENCY PROGRESS BARS */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 lg:col-span-1 flex flex-col justify-between">
+              <div>
+                <div className="border-b border-slate-100 pb-2">
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Analisis Efisiensi Biaya (Cost Ratio)</h3>
+                  <p className="text-[10px] text-slate-400 font-medium">Perbandingan pengeluaran usaha terhadap net sales turnover.</p>
+                </div>
+
+                <div className="space-y-4 text-xs font-semibold text-slate-700 mt-4">
+                  
+                  {/* COGS/HPP bar */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-slate-600">Harga Pokok Penjualan (HPP / COGS)</span>
+                      <span className="font-mono text-slate-900 font-bold">{hppToRevenueRatio.toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div className="bg-rose-500 h-full rounded-full" style={{ width: `${Math.min(100, hppToRevenueRatio)}%` }} />
+                    </div>
+                    <p className="text-[9px] text-slate-440">Porsi modal beli barang dari omset penjualan</p>
+                  </div>
+
+                  {/* OPEX bar */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-slate-600">Beban Operasional (OPEX)</span>
+                      <span className="font-mono text-slate-900 font-bold">{opexToRevenueRatio.toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div className="bg-indigo-500 h-full rounded-full" style={{ width: `${Math.min(100, opexToRevenueRatio)}%` }} />
+                    </div>
+                    <p className="text-[9px] text-slate-440">Biaya admin, sewa, listrik jalan dari omset</p>
+                  </div>
+
+                  {/* Net efficiency bar */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-slate-600">Rasio Beban Usaha Total (Total Cost Ratio)</span>
+                      <span className="font-mono text-slate-900 font-bold">{costToRevenueRatio.toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div className="bg-slate-700 h-full rounded-full" style={{ width: `${Math.min(100, costToRevenueRatio)}%` }} />
+                    </div>
+                    <p className="text-[9px] text-slate-440">Rekomendasi ambang kelola di bawah 75%</p>
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="mt-4 p-3 bg-slate-50 border border-slate-150 rounded-lg text-[10px] text-slate-500 font-medium leading-relaxed">
+                📢 <b>Evaluasi Cost:</b> {costToRevenueRatio > 75 ? 'Rasio biaya total melebihi 75% omset. Perlu evaluasi efisiensi harga beli barang atau efisiensi biaya overhead harian kantor.' : 'Efisiensi sangat baik. Rasio biaya terjaga rapi di bawah ambang batas aman 75%.'}
+              </div>
+            </div>
+
+            {/* COLUMN 2 & 3: PAJAK LEDGER INDONESIA (PPN/VAT, PPH FINAL) */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 lg:col-span-2">
+              <div className="border-b border-slate-100 pb-2">
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">Perhitungan Pajak Perusahaan (Tax Ledger)</h3>
+                <p className="text-[10px] text-slate-400 font-medium">Sistematisasi PPN RI 11% & PP 55 / PP 23 PPh Final UMKM 0.5%</p>
+              </div>
+
+              <div className="text-xs text-slate-700 space-y-4 font-semibold">
+                
+                {/* PPN Table */}
+                <div className="bg-slate-50 p-4 border border-slate-200 rounded-lg space-y-3">
+                  <h4 className="text-[10px] font-black text-indigo-800 border-b border-slate-200 pb-1.5 uppercase tracking-wide flex items-center gap-1">
+                    🏢 PPN (Pajak Pertambahan Nilai) - Tarif 11%
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1 bg-white p-3 rounded-md border border-slate-150">
+                      <span className="text-[9px] text-slate-400 uppercase font-black block">Pajak Keluaran (PPN Terpungut)</span>
+                      <p className="font-mono text-sm text-indigo-700 font-extrabold">{formatIDR(totalPajakKeluaran)}</p>
+                      <span className="text-[9px] text-slate-500 block font-medium">Berasal dari 11% pajak penjualan di kasir POS</span>
+                    </div>
+                    <div className="space-y-1 bg-white p-3 rounded-md border border-slate-150">
+                      <span className="text-[9px] text-slate-400 uppercase font-black block">Pajak Masukan (PPN Kredibel)</span>
+                      <p className="font-mono text-sm text-emerald-700 font-extrabold">{formatIDR(totalPajakMasukan)}</p>
+                      <span className="text-[9px] text-slate-500 block font-medium">Kredit PPN 11% atas belanja restock supply</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row justify-between items-center py-2.5 bg-slate-900 text-white rounded px-3.5 font-mono font-black text-[11px] gap-2">
+                    <span>STATUS LAPORAN PPN TERUTANG:</span>
+                    <span className="text-amber-400">
+                      {netPPNLiability >= 0 
+                        ? `KURANG BAYAR: ${formatIDR(netPPNLiability)}` 
+                        : `LEBIH BAYAR (REKONSILIASI): ${formatIDR(Math.abs(netPPNLiability))}`
+                      }
+                    </span>
+                  </div>
+                </div>
+
+                {/* PPh Final section */}
+                <div className="bg-slate-50 p-4 border border-slate-200 rounded-lg space-y-2">
+                  <h4 className="text-[10px] font-black text-emerald-800 border-b border-slate-200 pb-1.5 uppercase tracking-wide">
+                    💰 PPh Final UMKM PP 55 / PP 23 - Tarif 0.5%
+                  </h4>
+                  <p className="text-[9px] text-slate-400 font-medium leading-relaxed">
+                    * Sesuai Peraturan Pemerintah PP 55, wajib pajak badan / pribadi berstatus UMKM dengan omset di bawah Rp 4.8 Miliar per tahun dikenakan PPh Final 0.5% langsung dikalikan peredaran bruto penjualan kotor bulanan perusahaan.
+                  </p>
+                  
+                  <div className="space-y-1.5 mt-2.5">
+                    <div className="flex justify-between items-center py-1.5 border-b border-slate-200 text-slate-600">
+                      <span>Peredaran Bruto Omset Usaha (Turnover bruto)</span>
+                      <span className="font-mono text-slate-900 font-bold">{formatIDR(totalRawSales)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1.5 text-emerald-700 font-black">
+                      <span>PPh Final 0.5% Yang Wajib Disetor (Layanan E-Billing KPP)</span>
+                      <span className="font-mono text-sm">{formatIDR(totalTaxPPhUMKM)}</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
           </div>
 
         </div>

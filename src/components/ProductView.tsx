@@ -320,19 +320,23 @@ export default function ProductView({
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-1.5">
-                          {/* Viewer actions */}
-                          <button
-                            onClick={() => handleOpenEdit(prod)}
-                            className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all"
-                            title="Edit / Sesuaikan"
-                          >
-                            <Edit2 size={13} />
-                          </button>
+                          {/* Edit / View actions gated by role */}
+                          {(activeRole === 'admin' || activeRole === 'purchasing' || activeRole === 'gudang') ? (
+                            <button
+                              onClick={() => handleOpenEdit(prod)}
+                              className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all cursor-pointer"
+                              title="Edit / Sesuaikan"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">No permission</span>
+                          )}
                           
                           {(activeRole === 'admin' || activeRole === 'purchasing') && (
                             <button
                               onClick={() => handleDelete(prod.id)}
-                              className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all"
+                              className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all cursor-pointer"
                               title="Hapus Produk"
                             >
                               <Trash2 size={13} />
@@ -517,9 +521,9 @@ export default function ProductView({
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-md"
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-md cursor-pointer"
                 >
-                  Simpan Transaksi
+                  Simpan Produk
                 </button>
               </div>
 

@@ -211,6 +211,8 @@ export default function SalesView({
       customerId: Number(selectedCustomerId),
       salesDate: new Date().toISOString().slice(0, 10),
       total: rawSubtotal,
+      paymentMethod,
+      paymentStatus: paymentMethod === 'Tempo' ? 'UNPAID' : 'PAID',
       discount: discountPercent,
       tax: taxPercent,
       grandTotal: finalGrandTotal,
@@ -226,7 +228,7 @@ export default function SalesView({
       }))
     };
 
-    // 2. SIMULATE DATABAE TRIGGERS & DEDUCT STOCK
+    // 2. SIMULATE DATABASE TRIGGERS & DEDUCT STOCK
     setProducts(prevProducts => {
       return prevProducts.map(prod => {
         const qtyInCart = cart[prod.id] || 0;
@@ -246,9 +248,13 @@ export default function SalesView({
       addStockMovement(item.product.id, 'OUT', item.qty, 'SALES', nextInvoiceId);
     });
 
-    // register incomes bookkeeping
+    // register incomes bookkeeping if PAID
     const buyerName = customers.find(c => c.id === selectedCustomerId)?.name || 'Pelanggan';
-    addFinancialRecord('INCOME', `Kas masuk dari Penjualan POS Kasir (${invoiceNumber}) - Pelanggan: ${buyerName}`, finalGrandTotal);
+    if (paymentMethod !== 'Tempo') {
+      addFinancialRecord('INCOME', `Kas masuk dari Penjualan POS Kasir (${invoiceNumber}) - Pelanggan: ${buyerName}`, finalGrandTotal);
+    } else {
+      addAuditLog(`Tercatat PIUTANG penjualan dari ${buyerName} senilai ${formatIDR(finalGrandTotal)} untuk Faktur ${invoiceNumber}.`, 'warning', activeRole);
+    }
 
     // Append POS invoice
     setSales(prev => [newSalesRecord, ...prev]);
@@ -582,18 +588,19 @@ export default function SalesView({
             <div className="border-t border-slate-200 pt-3 space-y-3">
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Metode Pembayaran</label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {['Cash', 'QRIS', 'Transfer', 'Digital Wallet'].map(method => (
+                <div className="grid grid-cols-5 gap-1">
+                  {['Cash', 'QRIS', 'Transfer', 'Digital Wallet', 'Tempo'].map(method => (
                     <button
                       key={method}
+                      type="button"
                       onClick={() => setPaymentMethod(method)}
-                      className={`rounded px-1.5 py-1.5 text-[10px] font-bold border transition-all truncate ${
+                      className={`rounded py-1.5 text-[10px] font-extrabold border transition-all truncate cursor-pointer ${
                         paymentMethod === method
                           ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                           : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      {method}
+                      {method === 'Tempo' ? '⏱️ Tempo' : method}
                     </button>
                   ))}
                 </div>

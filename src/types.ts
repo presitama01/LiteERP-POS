@@ -60,6 +60,8 @@ export interface Purchase {
   supplierId: number;
   purchaseDate: string;
   total: number;
+  paymentMethod?: string; // 'Cash' | 'Tempo'
+  paymentStatus?: 'PAID' | 'UNPAID'; // UNPAID is Hutang
   createdBy: string;
   createdAt: string;
   items: PurchaseItem[];
@@ -80,7 +82,8 @@ export interface Sales {
   customerId: number;
   salesDate: string;
   total: number;
-  paymentMethod?: string;
+  paymentMethod?: string; // 'Cash' | 'QRIS' | 'Transfer' | 'Digital Wallet' | 'Kredit'
+  paymentStatus?: 'PAID' | 'UNPAID'; // UNPAID is Piutang
   discount: number;
   tax: number;
   grandTotal: number;

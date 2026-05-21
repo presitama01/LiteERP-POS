@@ -372,6 +372,7 @@ export default function App() {
                 salesDate: added.salesDate,
                 total: added.total,
                 paymentMethod: added.paymentMethod,
+                paymentStatus: added.paymentStatus || 'PAID',
                 discount: added.discount,
                 tax: added.tax,
                 grandTotal: added.grandTotal,
@@ -418,6 +419,8 @@ export default function App() {
                 supplierId: added.supplierId,
                 purchaseDate: added.purchaseDate,
                 total: added.total,
+                paymentMethod: added.paymentMethod || 'Cash',
+                paymentStatus: added.paymentStatus || 'PAID',
                 createdBy: added.createdBy
               },
               added.items.map(item => ({
@@ -923,6 +926,8 @@ export default function App() {
             categories={categories}
             suppliers={suppliers}
             customers={customers}
+            setPurchases={setPurchases}
+            setSales={setSales}
           />
         );
       case 'schema':

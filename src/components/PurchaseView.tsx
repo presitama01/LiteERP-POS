@@ -46,6 +46,7 @@ export default function PurchaseView({
   const [supplierId, setSupplierId] = useState<number>(1);
   const [invoiceNumber, setInvoiceNumber] = useState(`PUR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-001`);
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Tempo'>('Cash');
 
   // Current draft list of items to buy
   const [draftItems, setDraftItems] = useState<{ productId: number; qty: number; buyPrice: number }[]>([]);
@@ -121,6 +122,8 @@ export default function PurchaseView({
       supplierId: Number(supplierId),
       purchaseDate,
       total: totalPurchaseCost,
+      paymentMethod,
+      paymentStatus: paymentMethod === 'Tempo' ? 'UNPAID' : 'PAID',
       createdBy: 'Simulated Purchasing Andi',
       createdAt: new Date().toISOString(),
       items: draftItems.map((item, idx) => ({
@@ -154,9 +157,13 @@ export default function PurchaseView({
       addStockMovement(item.productId, 'IN', item.qty, 'PURCHASE', nextId);
     });
 
-    // register expenses finance ledger
+    // register expenses finance ledger only if cash spent instantly
     const vendorName = suppliers.find(s => s.id === supplierId)?.name || 'Supplier';
-    addFinancialRecord('EXPENSE', `Biaya Pembelian / Re-stock Bahan Dagang (${invoiceNumber}) - Supplier: ${vendorName}`, totalPurchaseCost);
+    if (paymentMethod === 'Cash') {
+      addFinancialRecord('EXPENSE', `Biaya Pembelian / Re-stock Bahan Dagang (${invoiceNumber}) - Supplier: ${vendorName}`, totalPurchaseCost);
+    } else {
+      addAuditLog(`Tercatat HUTANG usaha kepada ${vendorName} untuk Faktur ${invoiceNumber} senilai ${formatIDR(totalPurchaseCost)}.`, 'warning', 'purchasing');
+    }
 
     // Save
     setPurchases(prev => [newPurchaseRecord, ...prev]);
@@ -171,6 +178,7 @@ export default function PurchaseView({
 
     // Reset POS form
     setDraftItems([]);
+    setPaymentMethod('Cash');
     setInvoiceNumber(`PUR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-00${nextId + 1}`);
     alert(`Transaksi restock barang dengan No Invoice ${invoiceNumber} berhasil dicatat.`);
   };
@@ -243,6 +251,35 @@ export default function PurchaseView({
                 onChange={(e) => setPurchaseDate(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 p-1.5 font-bold text-slate-800 focus:outline-none cursor-pointer"
               />
+            </div>
+          </div>
+
+          {/* Payment Method Selector */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Metode Pembayaran *</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('Cash')}
+                className={`py-2 rounded-lg border text-xs font-bold text-center transition-all cursor-pointer ${
+                  paymentMethod === 'Cash'
+                    ? 'bg-blue-50 text-blue-700 border-blue-500 shadow-xs'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                💵 Lunas (Tunai)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('Tempo')}
+                className={`py-2 rounded-lg border text-xs font-bold text-center transition-all cursor-pointer ${
+                  paymentMethod === 'Tempo'
+                    ? 'bg-amber-50 text-amber-700 border-amber-500 shadow-xs'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                ⏱️ Tempo (Hutang)
+              </button>
             </div>
           </div>
 
