@@ -132,7 +132,7 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: psi-admin atau psi-kasir"
+                    placeholder="Masukan username..."
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full bg-slate-900 rounded-lg border border-slate-800 py-3 pl-10 pr-4 text-xs font-bold text-white transition-all focus:border-blue-500 focus:outline-none placeholder-slate-600"
@@ -143,7 +143,6 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
               <div>
                 <div className="flex justify-between items-center mb-1.5">
                   <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider">Password</label>
-                  <span className="text-[10px] text-slate-500">Password = akhiran username (cth: admin, kasir)</span>
                 </div>
                 <div className="relative">
                   <span className="absolute left-3 top-3.5 text-slate-500">

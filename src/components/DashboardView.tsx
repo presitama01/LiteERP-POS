@@ -167,36 +167,17 @@ export default function DashboardView({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button 
-              onClick={onReconnect}
-              disabled={supabaseStatus === 'checking'}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition-all disabled:opacity-50"
-            >
-              <RefreshCw size={13} className={supabaseStatus === 'checking' ? 'animate-spin' : ''} />
-              Refresh Sync
-            </button>
-
-            {supabaseStatus === 'no_tables' && (
+          {supabaseStatus === 'no_tables' && (
+            <div className="flex flex-wrap items-center gap-2">
               <button 
                 onClick={() => setView('schema')}
-                className="inline-flex items-center gap-1 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg shadow-sm hover:shadow active:scale-95 transition-all"
+                className="inline-flex items-center gap-1 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg shadow-sm hover:shadow active:scale-95 transition-all cursor-pointer"
               >
                 Inisialisasi Tabel
                 <ArrowRight size={13} />
               </button>
-            )}
-
-            {supabaseStatus === 'live' && products.length === 0 && (
-              <button 
-                onClick={onSeedDatabase}
-                disabled={isSeeding}
-                className="inline-flex items-center gap-1 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg shadow-sm hover:shadow active:scale-95 transition-all disabled:opacity-50"
-              >
-                {isSeeding ? 'Seeding...' : 'Seed Data Awal Supabase'}
-              </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
       
