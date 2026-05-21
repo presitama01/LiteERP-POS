@@ -84,20 +84,38 @@ export default function DashboardView({
     }
   };
 
-  // Dynamic Chart coordinate calculation
-  // Monthly mock visualization for 6 periods
-  const chartData = [
-    { name: 'Mei 15', income: 0, expense: 2650000 },
-    { name: 'Mei 16', income: 0, expense: 0 },
-    { name: 'Mei 17', income: 0, expense: 0 },
-    { name: 'Mei 18', income: 109800, expense: 0 },
-    { name: 'Mei 19', income: 144300, expense: 150000 },
-    { name: 'Mei 20', income: totalSalesAmount - (109800 + 144300), expense: totalPurchasesAmount - 2650000 }
-  ];
+  // Dynamic Chart coordinate calculation ending with today (last 7 days rolling)
+  const chartData = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    // 6-i days ago, meaning index 0 is 6 days ago, index 6 is today
+    d.setDate(d.getDate() - (6 - i));
+    
+    // Format to YYYY-MM-DD for dynamic state matching
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    
+    // Name label (e.g., "Mei 15")
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const name = `${monthNames[d.getMonth()]} ${d.getDate()}`;
+    
+    // Aggregate income/expense directly from the real-time financials ledger
+    const income = financials
+      .filter(f => f.transactionDate === dateStr && f.type === 'INCOME')
+      .reduce((sum, f) => sum + f.amount, 0);
 
-  // Map true financials to populate the current day values
-  chartData[5].income = Math.max(0, sales.filter(s => s.salesDate === '2026-05-20').reduce((sum, s) => sum + s.grandTotal, 0));
-  chartData[5].expense = Math.max(0, purchases.filter(p => p.purchaseDate === '2026-05-20').reduce((sum, p) => sum + p.total, 0));
+    const expense = financials
+      .filter(f => f.transactionDate === dateStr && f.type === 'EXPENSE')
+      .reduce((sum, f) => sum + f.amount, 0);
+
+    return {
+      name,
+      fullDateLabel: `${d.getDate()} ${monthNames[d.getMonth()]} ${yyyy}`,
+      income,
+      expense
+    };
+  });
 
   const maxVal = Math.max(...chartData.flatMap(d => [d.income, d.expense]), 500000) * 1.15;
 
@@ -360,12 +378,12 @@ export default function DashboardView({
               <div 
                 className="absolute bg-slate-900 text-white rounded-lg p-3 text-xs shadow-xl border border-slate-700 pointer-events-none"
                 style={{
-                  left: `${(hoveredDataIndex / 5) * 80 + 5}%`,
+                  left: `${(hoveredDataIndex / (chartData.length - 1)) * 80 + 5}%`,
                   top: '10%'
                 }}
               >
                 <div className="font-bold mb-1 border-b border-slate-700 pb-1 text-slate-300">
-                  Tanggal: {chartData[hoveredDataIndex].name} Mei 2026
+                  Tanggal: {chartData[hoveredDataIndex].fullDateLabel}
                 </div>
                 <div className="text-blue-400 flex justify-between gap-4">
                   <span>Pemasukan:</span> 

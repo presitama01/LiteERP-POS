@@ -194,14 +194,15 @@ export default function App() {
     roleOverride?: string
   ) => {
     const nextLogId = `log-${Math.random().toString(36).substring(2, 9)}`;
+    const resolvedRole = (roleOverride as UserRole) || activeRole;
     const newLogItem: SystemAuditLog = {
       id: nextLogId,
       timestamp: new Date().toISOString(),
-      role: (roleOverride as UserRole) || activeRole,
-      user: activeRole === 'admin' ? 'Administrator' : 
-            activeRole === 'kasir' ? 'Siti (Kasir)' :
-            activeRole === 'purchasing' ? 'Andi (Purchasing)' :
-            activeRole === 'gudang' ? 'Hasan (Gudang)' : 'Rian (Finance)',
+      role: resolvedRole,
+      user: resolvedRole === 'admin' ? 'Administrator' : 
+            resolvedRole === 'kasir' ? 'Siti (Kasir)' :
+            resolvedRole === 'purchasing' ? 'Andi (Purchasing)' :
+            resolvedRole === 'gudang' ? 'Hasan (Gudang)' : 'Rian (Finance)',
       action,
       type
     };
