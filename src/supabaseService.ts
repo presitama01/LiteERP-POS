@@ -275,6 +275,18 @@ export async function deleteCategory(id: number): Promise<void> {
   if (error) throw error;
 }
 
+export async function updateCategory(id: number, name: string): Promise<Category> {
+  const { data, error } = await supabase
+    .from('categories')
+    .update({ name })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapCategory(data);
+}
+
 export async function insertProduct(p: Omit<Product, 'id' | 'createdAt'>): Promise<Product> {
   const { data, error } = await supabase
     .from('products')
@@ -343,6 +355,31 @@ export async function insertSupplier(sup: Omit<Supplier, 'id'>): Promise<Supplie
   return mapSupplier(data);
 }
 
+export async function updateSupplier(id: number, sup: Partial<Omit<Supplier, 'id'>>): Promise<Supplier> {
+  const { data, error } = await supabase
+    .from('suppliers')
+    .update({
+      name: sup.name,
+      phone: sup.phone,
+      address: sup.address
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapSupplier(data);
+}
+
+export async function deleteSupplier(id: number): Promise<void> {
+  const { error } = await supabase
+    .from('suppliers')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+}
+
 export async function insertCustomer(cust: Omit<Customer, 'id'>): Promise<Customer> {
   const { data, error } = await supabase
     .from('customers')
@@ -356,6 +393,31 @@ export async function insertCustomer(cust: Omit<Customer, 'id'>): Promise<Custom
 
   if (error) throw error;
   return mapCustomer(data);
+}
+
+export async function updateCustomer(id: number, cust: Partial<Omit<Customer, 'id'>>): Promise<Customer> {
+  const { data, error } = await supabase
+    .from('customers')
+    .update({
+      name: cust.name,
+      phone: cust.phone,
+      address: cust.address
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapCustomer(data);
+}
+
+export async function deleteCustomer(id: number): Promise<void> {
+  const { error } = await supabase
+    .from('customers')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
 }
 
 // Write a sales order with deep details

@@ -18,7 +18,12 @@ import {
   ArrowUpRight,
   Database,
   Plus,
-  X
+  X,
+  Search,
+  Edit,
+  Trash2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { 
   UserProfile, 
@@ -62,12 +67,17 @@ import { checkSupabaseConnection } from './supabaseClient';
 import { 
   fetchAllSupabaseData,
   insertCategory,
+  updateCategory,
   deleteCategory,
   insertProduct,
   updateProduct,
   deleteProduct,
   insertSupplier,
+  updateSupplier,
+  deleteSupplier,
   insertCustomer,
+  updateCustomer,
+  deleteCustomer,
   insertSalesOrder,
   insertPurchaseOrder,
   insertFinancialRecord,
@@ -172,15 +182,37 @@ export default function App() {
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
+  const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
+  const [editCategoryId, setEditCategoryId] = useState<number | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState('');
+
   const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
   const [newSupplierName, setNewSupplierName] = useState('');
   const [newSupplierPhone, setNewSupplierPhone] = useState('');
   const [newSupplierAddress, setNewSupplierAddress] = useState('');
 
+  const [showEditSupplierModal, setShowEditSupplierModal] = useState(false);
+  const [editSupplierId, setEditSupplierId] = useState<number | null>(null);
+  const [editSupplierName, setEditSupplierName] = useState('');
+  const [editSupplierPhone, setEditSupplierPhone] = useState('');
+  const [editSupplierAddress, setEditSupplierAddress] = useState('');
+
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [newCustomerAddress, setNewCustomerAddress] = useState('');
+
+  const [showEditCustomerModal, setShowEditCustomerModal] = useState(false);
+  const [editCustomerId, setEditCustomerId] = useState<number | null>(null);
+  const [editCustomerName, setEditCustomerName] = useState('');
+  const [editCustomerPhone, setEditCustomerPhone] = useState('');
+  const [editCustomerAddress, setEditCustomerAddress] = useState('');
+
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [supplierPage, setSupplierPage] = useState(0);
+
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerPage, setCustomerPage] = useState(0);
 
   // 3. SUPABASE INTEGRATION STATES
   const [supabaseStatus, setSupabaseStatus] = useState<'checking' | 'live' | 'no_tables' | 'error' | 'disconnected'>('checking');
@@ -602,6 +634,127 @@ export default function App() {
     }
   };
 
+  const handleEditCategory = async (id: number, name: string) => {
+    if (!name.trim()) return;
+    const oldCat = categoriesState.find(c => c.id === id);
+    const oldName = oldCat ? oldCat.name : '';
+    
+    setCategoriesState(prev => prev.map(c => c.id === id ? { ...c, name } : c));
+    addAuditLog(`Mengubah Kategori "${oldName}" menjadi "${name}"`, 'success');
+
+    if (supabaseStatus === 'live') {
+      try {
+        const freshCat = await updateCategory(id, name);
+        setCategoriesState(prev => prev.map(c => c.id === id ? freshCat : c));
+        addAuditLog(`Supabase Live: Update Kategori "${name}" berhasil sinkron`, 'success');
+      } catch (err: any) {
+        console.error(err);
+        addAuditLog(`Gagal sinkron Edit Kategori ke Supabase: ${err.message}`, 'error');
+      }
+    }
+  };
+
+  const handleDeleteCategory = async (id: number) => {
+    const cat = categoriesState.find(c => c.id === id);
+    if (!cat) return;
+    const isUsed = productsState.some(p => p.categoryId === id);
+    if (isUsed) {
+      alert(`Kategori "${cat.name}" sedang digunakan oleh data produk. Silakan ubah kategori produk tersebut terlebih dahulu.`);
+      return;
+    }
+
+    if (!confirm(`Apakah Anda yakin ingin menghapus kategori "${cat.name}"?`)) return;
+
+    setCategoriesState(prev => prev.filter(c => c.id !== id));
+    addAuditLog(`Menghapus Kategori: "${cat.name}"`, 'warning');
+
+    if (supabaseStatus === 'live') {
+      try {
+        await deleteCategory(id);
+        addAuditLog(`Supabase Live: Kategori "${cat.name}" berhasil dihapus dari cloud`, 'success');
+      } catch (err: any) {
+        console.error(err);
+        addAuditLog(`Gagal sinkron Hapus Kategori ke Supabase: ${err.message}`, 'error');
+      }
+    }
+  };
+
+  const handleEditSupplier = async (id: number, name: string, phone: string, address: string) => {
+    if (!name.trim()) return;
+    
+    setSuppliersState(prev => prev.map(s => s.id === id ? { id, name, phone, address } : s));
+    addAuditLog(`Mengubah profil Supplier: "${name}"`, 'success');
+
+    if (supabaseStatus === 'live') {
+      try {
+        const freshSup = await updateSupplier(id, { name, phone, address });
+        setSuppliersState(prev => prev.map(s => s.id === id ? freshSup : s));
+        addAuditLog(`Supabase Live: Supplier "${name}" berhasil diperbarui`, 'success');
+      } catch (err: any) {
+        console.error(err);
+        addAuditLog(`Gagal sinkron Edit Supplier ke Supabase: ${err.message}`, 'error');
+      }
+    }
+  };
+
+  const handleDeleteSupplier = async (id: number) => {
+    const sup = suppliersState.find(s => s.id === id);
+    if (!sup) return;
+
+    if (!confirm(`Apakah Anda yakin ingin menghapus supplier "${sup.name}"?`)) return;
+
+    setSuppliersState(prev => prev.filter(s => s.id !== id));
+    addAuditLog(`Menghapus Supplier: "${sup.name}"`, 'warning');
+
+    if (supabaseStatus === 'live') {
+      try {
+        await deleteSupplier(id);
+        addAuditLog(`Supabase Live: Supplier "${sup.name}" berhasil dihapus dari cloud`, 'success');
+      } catch (err: any) {
+        console.error(err);
+        addAuditLog(`Gagal sinkron Hapus Supplier ke Supabase: ${err.message}`, 'error');
+      }
+    }
+  };
+
+  const handleEditCustomer = async (id: number, name: string, phone: string, address: string) => {
+    if (!name.trim()) return;
+
+    setCustomersState(prev => prev.map(c => c.id === id ? { id, name, phone, address } : c));
+    addAuditLog(`Mengubah profil Pelanggan: "${name}"`, 'success');
+
+    if (supabaseStatus === 'live') {
+      try {
+        const freshCust = await updateCustomer(id, { name, phone, address });
+        setCustomersState(prev => prev.map(c => c.id === id ? freshCust : c));
+        addAuditLog(`Supabase Live: Pelanggan "${name}" berhasil diperbarui`, 'success');
+      } catch (err: any) {
+        console.error(err);
+        addAuditLog(`Gagal sinkron Edit Pelanggan ke Supabase: ${err.message}`, 'error');
+      }
+    }
+  };
+
+  const handleDeleteCustomer = async (id: number) => {
+    const cust = customersState.find(c => c.id === id);
+    if (!cust) return;
+
+    if (!confirm(`Apakah Anda yakin ingin menghapus pelanggan "${cust.name}"?`)) return;
+
+    setCustomersState(prev => prev.filter(c => c.id !== id));
+    addAuditLog(`Menghapus Pelanggan: "${cust.name}"`, 'warning');
+
+    if (supabaseStatus === 'live') {
+      try {
+        await deleteCustomer(id);
+        addAuditLog(`Supabase Live: Pelanggan "${cust.name}" berhasil dihapus dari cloud`, 'success');
+      } catch (err: any) {
+        console.error(err);
+        addAuditLog(`Gagal sinkron Hapus Pelanggan ke Supabase: ${err.message}`, 'error');
+      }
+    }
+  };
+
   // Proxy getters for child views
   const products = productsState;
   const categories = categoriesState;
@@ -747,20 +900,57 @@ export default function App() {
               <div className="space-y-2">
                 {categories.map((cat, idx) => (
                   <div key={cat.id} className="flex justify-between items-center rounded-lg border border-slate-100 p-3 bg-slate-50 font-bold text-slate-800 text-xs">
-                    <span>{cat.name}</span>
-                    <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-[10px]">
-                      ID: {cat.id}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="bg-slate-200 text-slate-600 px-2.5 py-1 rounded text-[10px] font-mono">
+                        ID: {cat.id}
+                      </span>
+                      <span className="text-sm font-semibold">{cat.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setEditCategoryId(cat.id);
+                          setEditCategoryName(cat.name);
+                          setShowEditCategoryModal(true);
+                        }}
+                        className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-150 hover:text-blue-600 transition-all cursor-pointer bg-white"
+                        title="Edit Kategori"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCategory(cat.id)}
+                        className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all cursor-pointer bg-white"
+                        title="Hapus Kategori"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           </div>
         );
-      case 'suppliers':
+      case 'suppliers': {
+        const filteredSuppliers = suppliers.filter(sup => {
+          const s = supplierSearch.toLowerCase();
+          return (
+            sup.name.toLowerCase().includes(s) ||
+            sup.phone.toLowerCase().includes(s) ||
+            sup.address.toLowerCase().includes(s)
+          );
+        });
+
+        const recordsPerPage = 100;
+        const totalPages = Math.ceil(filteredSuppliers.length / recordsPerPage) || 1;
+        const sPage = Math.min(supplierPage, totalPages - 1);
+        const startIndex = sPage * recordsPerPage;
+        const paginatedSuppliers = filteredSuppliers.slice(startIndex, startIndex + recordsPerPage);
+
         return (
           <div className="space-y-6">
-            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200/60 shadow-xs">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-4 rounded-xl border border-slate-200/60 shadow-xs">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">Master Data Supplier</h2>
                 <p className="text-xs text-slate-500 font-medium">Mitra bisnis/vendor penunjang re-stock barang di gudang utama</p>
@@ -772,29 +962,138 @@ export default function App() {
                   setNewSupplierAddress('');
                   setShowAddSupplierModal(true);
                 }}
-                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm transition-all cursor-pointer"
+                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm transition-all cursor-pointer self-start sm:self-auto"
               >
                 <Plus size={14} />
                 <span>Tambah Supplier</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {suppliers.map(sup => (
-                <div key={sup.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm text-xs font-semibold text-slate-700 leading-relaxed space-y-2">
-                  <span className="bg-blue-50 text-blue-700 font-black rounded text-[9px] uppercase px-1.5 py-0.5">Supplier {sup.id}</span>
-                  <h4 className="text-sm font-bold text-slate-900">{sup.name}</h4>
-                  <p>📞 Phone: <span className="font-mono text-slate-600">{sup.phone}</span></p>
-                  <p className="text-slate-500">🏠 {sup.address}</p>
+            {/* Filter Search */}
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="relative max-w-md">
+                <Search className="absolute top-2.5 left-3 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Cari berdasarkan nama supplier, telepon, atau alamat..."
+                  value={supplierSearch}
+                  onChange={e => {
+                    setSupplierSearch(e.target.value);
+                    setSupplierPage(0); // reset page
+                  }}
+                  className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-4 text-xs font-medium focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Table View */}
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-xs bg-white">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase tracking-wider font-semibold">
+                    <tr>
+                      <th scope="col" className="px-6 py-4">ID</th>
+                      <th scope="col" className="px-6 py-4">Nama Supplier</th>
+                      <th scope="col" className="px-6 py-4">No. Telepon</th>
+                      <th scope="col" className="px-6 py-4">Alamat</th>
+                      <th scope="col" className="px-6 py-4 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {paginatedSuppliers.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-12 text-slate-400">
+                          Tidak ada data supplier yang cocok.
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedSuppliers.map(sup => (
+                        <tr key={sup.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 font-mono font-bold text-slate-500">#{sup.id}</td>
+                          <td className="px-6 py-4 font-bold text-slate-900">{sup.name}</td>
+                          <td className="px-6 py-4 font-mono text-slate-600">{sup.phone || '-'}</td>
+                          <td className="px-6 py-4 text-slate-500 max-w-xs truncate" title={sup.address}>{sup.address || '-'}</td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setEditSupplierId(sup.id);
+                                  setEditSupplierName(sup.name);
+                                  setEditSupplierPhone(sup.phone);
+                                  setEditSupplierAddress(sup.address);
+                                  setShowEditSupplierModal(true);
+                                }}
+                                className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all cursor-pointer bg-white"
+                                title="Edit Supplier"
+                              >
+                                <Edit size={13} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteSupplier(sup.id)}
+                                className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all cursor-pointer bg-white"
+                                title="Hapus Supplier"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination (100 records per page) */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3 bg-slate-50 text-xs text-slate-700">
+                  <div className="text-slate-500">
+                    Menampilkan <span className="font-bold">{startIndex + 1}</span> sampai{' '}
+                    <span className="font-bold">{Math.min(startIndex + recordsPerPage, filteredSuppliers.length)}</span> dari{' '}
+                    <span className="font-bold">{filteredSuppliers.length}</span> supplier (Limit 100/page)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSupplierPage(p => Math.max(0, p - 1))}
+                      disabled={sPage === 0}
+                      className="rounded border border-slate-200 p-1 text-slate-600 hover:bg-white disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span className="text-slate-700 font-bold">Halaman {sPage + 1} dari {totalPages}</span>
+                    <button
+                      onClick={() => setSupplierPage(p => Math.min(totalPages - 1, p + 1))}
+                      disabled={sPage >= totalPages - 1}
+                      className="rounded border border-slate-200 p-1 text-slate-600 hover:bg-white disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         );
-      case 'customers':
+      }
+      case 'customers': {
+        const filteredCustomers = customers.filter(cust => {
+          const s = customerSearch.toLowerCase();
+          return (
+            cust.name.toLowerCase().includes(s) ||
+            cust.phone.toLowerCase().includes(s) ||
+            cust.address.toLowerCase().includes(s)
+          );
+        });
+
+        const recordsPerPage = 100;
+        const totalPages = Math.ceil(filteredCustomers.length / recordsPerPage) || 1;
+        const cPage = Math.min(customerPage, totalPages - 1);
+        const startIndex = cPage * recordsPerPage;
+        const paginatedCustomers = filteredCustomers.slice(startIndex, startIndex + recordsPerPage);
+
         return (
           <div className="space-y-6">
-            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200/60 shadow-xs">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-4 rounded-xl border border-slate-200/60 shadow-xs">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">Master Data Pelanggan Utama</h2>
                 <p className="text-xs text-slate-500 font-medium">Database profil pelanggan setia untuk pengiriman invoice dan pencatatan riwayat beli</p>
@@ -806,25 +1105,119 @@ export default function App() {
                   setNewCustomerAddress('');
                   setShowAddCustomerModal(true);
                 }}
-                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm transition-all cursor-pointer"
+                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm transition-all cursor-pointer self-start sm:self-auto"
               >
                 <Plus size={14} />
                 <span>Tambah Pelanggan</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {customers.map(cust => (
-                <div key={cust.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm text-xs font-semibold text-slate-700 leading-relaxed space-y-2">
-                  <span className="bg-purple-50 text-purple-700 font-black rounded text-[9px] uppercase px-1.5 py-0.5">Customer {cust.id}</span>
-                  <h4 className="text-sm font-bold text-slate-900">{cust.name}</h4>
-                  <p>📞 Phone: <span className="font-mono text-slate-600">{cust.phone}</span></p>
-                  <p className="text-slate-500">🏠 {cust.address}</p>
+            {/* Filter Search */}
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="relative max-w-md">
+                <Search className="absolute top-2.5 left-3 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Cari berdasarkan nama pelanggan, telepon, atau alamat..."
+                  value={customerSearch}
+                  onChange={e => {
+                    setCustomerSearch(e.target.value);
+                    setCustomerPage(0); // reset page
+                  }}
+                  className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-4 text-xs font-medium focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Table View */}
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-left text-xs bg-white">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 uppercase tracking-wider font-semibold">
+                    <tr>
+                      <th scope="col" className="px-6 py-4">ID</th>
+                      <th scope="col" className="px-6 py-4">Nama Pelanggan</th>
+                      <th scope="col" className="px-6 py-4">No. Telepon</th>
+                      <th scope="col" className="px-6 py-4">Alamat</th>
+                      <th scope="col" className="px-6 py-4 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {paginatedCustomers.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-12 text-slate-400">
+                          Tidak ada data pelanggan yang cocok.
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedCustomers.map(cust => (
+                        <tr key={cust.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 font-mono font-bold text-slate-500">#{cust.id}</td>
+                          <td className="px-6 py-4 font-bold text-slate-900">{cust.name}</td>
+                          <td className="px-6 py-4 font-mono text-slate-600">{cust.phone || '-'}</td>
+                          <td className="px-6 py-4 text-slate-500 max-w-xs truncate" title={cust.address}>{cust.address || '-'}</td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setEditCustomerId(cust.id);
+                                  setEditCustomerName(cust.name);
+                                  setEditCustomerPhone(cust.phone);
+                                  setEditCustomerAddress(cust.address);
+                                  setShowEditCustomerModal(true);
+                                }}
+                                className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all cursor-pointer bg-white"
+                                title="Edit Pelanggan"
+                              >
+                                <Edit size={13} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCustomer(cust.id)}
+                                className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all cursor-pointer bg-white"
+                                title="Hapus Pelanggan"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination (100 records per page) */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3 bg-slate-50 text-xs text-slate-700">
+                  <div className="text-slate-500">
+                    Menampilkan <span className="font-bold">{startIndex + 1}</span> sampai{' '}
+                    <span className="font-bold">{Math.min(startIndex + recordsPerPage, filteredCustomers.length)}</span> dari{' '}
+                    <span className="font-bold">{filteredCustomers.length}</span> pelanggan (Limit 100/page)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCustomerPage(p => Math.max(0, p - 1))}
+                      disabled={cPage === 0}
+                      className="rounded border border-slate-200 p-1 text-slate-600 hover:bg-white disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span className="text-slate-700 font-bold">Halaman {cPage + 1} dari {totalPages}</span>
+                    <button
+                      onClick={() => setCustomerPage(p => Math.min(totalPages - 1, p + 1))}
+                      disabled={cPage >= totalPages - 1}
+                      className="rounded border border-slate-200 p-1 text-slate-600 hover:bg-white disabled:opacity-40 cursor-pointer"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         );
+      }
       case 'purchase':
         return (
           <PurchaseView 
@@ -1206,6 +1599,212 @@ export default function App() {
                   className="rounded-lg bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700 transition-all text-xs cursor-pointer"
                 >
                   Simpan Pelanggan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT CATEGORY */}
+      {showEditCategoryModal && (
+        <div id="edit-category-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-2xl animate-in fade-in duration-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <span>📁</span> Edit Kategori
+              </h3>
+              <button 
+                onClick={() => setShowEditCategoryModal(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (editCategoryId === null || !editCategoryName.trim()) return;
+              await handleEditCategory(editCategoryId, editCategoryName);
+              setShowEditCategoryModal(false);
+            }} className="space-y-4 text-xs font-semibold">
+              <div className="space-y-1">
+                <label className="block text-slate-700 font-bold">Nama Kategori *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: ATK, Sparepart, Chemical..."
+                  value={editCategoryName}
+                  onChange={(e) => setEditCategoryName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 p-2.5 font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEditCategoryModal(false)}
+                  className="rounded-lg border border-slate-200 px-4 py-2 font-bold text-slate-600 hover:bg-slate-50 transition-colors text-xs"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700 transition-all text-xs cursor-pointer"
+                >
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT SUPPLIER */}
+      {showEditSupplierModal && (
+        <div id="edit-supplier-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-2xl animate-in fade-in duration-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <span>🏢</span> Edit Profil Supplier
+              </h3>
+              <button 
+                onClick={() => setShowEditSupplierModal(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (editSupplierId === null || !editSupplierName.trim()) return;
+              await handleEditSupplier(editSupplierId, editSupplierName, editSupplierPhone, editSupplierAddress);
+              setShowEditSupplierModal(false);
+            }} className="space-y-4 text-xs font-semibold">
+              <div className="space-y-1">
+                <label className="block text-slate-700 font-bold">Nama Supplier *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: PT UNIMETRIKA UTAMA..."
+                  value={editSupplierName}
+                  onChange={(e) => setEditSupplierName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 p-2.5 font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-slate-700 font-bold">Nomor Telepon</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: +6281310318868..."
+                  value={editSupplierPhone}
+                  onChange={(e) => setEditSupplierPhone(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 p-2.5 font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-slate-700 font-bold">Alamat Lengkap</label>
+                <textarea
+                  placeholder="Contoh: JL. Agung Timur 8 Sunter Jaya, Jakarta..."
+                  value={editSupplierAddress}
+                  onChange={(e) => setEditSupplierAddress(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-slate-200 p-2.5 font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEditSupplierModal(false)}
+                  className="rounded-lg border border-slate-200 px-4 py-2 font-bold text-slate-600 hover:bg-slate-50 transition-colors text-xs"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700 transition-all text-xs cursor-pointer"
+                >
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT CUSTOMER */}
+      {showEditCustomerModal && (
+        <div id="edit-customer-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-2xl animate-in fade-in duration-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <span>👥</span> Edit Profil Pelanggan
+              </h3>
+              <button 
+                onClick={() => setShowEditCustomerModal(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (editCustomerId === null || !editCustomerName.trim()) return;
+              await handleEditCustomer(editCustomerId, editCustomerName, editCustomerPhone, editCustomerAddress);
+              setShowEditCustomerModal(false);
+            }} className="space-y-4 text-xs font-semibold">
+              <div className="space-y-1">
+                <label className="block text-slate-700 font-bold">Nama Pelanggan *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Budi Santoso..."
+                  value={editCustomerName}
+                  onChange={(e) => setEditCustomerName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 p-2.5 font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-slate-700 font-bold">Nomor Telepon</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: +628..."
+                  value={editCustomerPhone}
+                  onChange={(e) => setEditCustomerPhone(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 p-2.5 font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-slate-700 font-bold">Alamat Pelanggan</label>
+                <textarea
+                  placeholder="Contoh: Perumahan Indah Permai, Bekasi..."
+                  value={editCustomerAddress}
+                  onChange={(e) => setEditCustomerAddress(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-slate-200 p-2.5 font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEditCustomerModal(false)}
+                  className="rounded-lg border border-slate-200 px-4 py-2 font-bold text-slate-600 hover:bg-slate-50 transition-colors text-xs"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700 transition-all text-xs cursor-pointer"
+                >
+                  Simpan Perubahan
                 </button>
               </div>
             </form>
